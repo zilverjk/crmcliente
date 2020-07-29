@@ -1,9 +1,31 @@
-import React from 'react'
-import Layout from '../components/Layout'
-import { useFormik } from 'formik'
+import React, { useState } from 'react'
+import { useRouter } from 'next/router'
 import * as Yup from 'yup'
+import { useFormik } from 'formik'
+import Layout from '../components/Layout'
+import { useQuery, useMutation, gql, from } from '@apollo/client'
+
+const NUEVA_CUENTA = gql`
+  mutation nuevoUsuario($input: UsuarioInput) {
+    nuevoUsuario(input: $input) {
+      id
+      nombre
+      apellido
+      email
+    }
+  }
+`
 
 const NuevaCuenta = () => {
+  // State para el mensaje
+  const [mensaje, guardarMensaje] = useState(null)
+
+  // Mutation para crear nuevos usuarios
+  const [nuevoUsuario] = useMutation(NUEVA_CUENTA)
+
+  // Routing
+  const router = useRouter()
+
   // Validación de formulario
   const formik = useFormik({
     initialValues: {
@@ -20,15 +42,53 @@ const NuevaCuenta = () => {
         .required('La contraseña es obligatoria')
         .min(6, 'La contraseña debe contener como mínimo 6 caracteres'),
     }),
-    onSubmit: values => {
-      console.log('enviando...')
-      console.log(values)
+    onSubmit: async values => {
+      const { nombre, apellido, email, password } = values
+
+      try {
+        const { data } = await nuevoUsuario({
+          variables: {
+            input: {
+              nombre,
+              apellido,
+              email,
+              password,
+            },
+          },
+        })
+
+        // Usuario creado
+        guardarMensaje(`Se creó correctamente el usuario de ${data.nuevoUsuario.nombre} ${data.nuevoUsuario.apellido}`)
+
+        // Despues de 3 seg, borra el mensaje y redirije a la página de login
+        setTimeout(() => {
+          guardarMensaje(null)
+          router.push('/login')
+        }, 3000)
+      } catch (error) {
+        guardarMensaje(error.message.replace('GraphQL error: ', ''))
+
+        // El mensaje desaparece luego de 3 seg
+        setTimeout(() => {
+          guardarMensaje(null)
+        }, 3000)
+      }
     },
   })
+
+  const mostrarMensaje = () => {
+    return (
+      <div className="bg-white py-2 px-3 w-full my-3 max-w-sm text-center mx-auto">
+        <p>{mensaje}</p>
+      </div>
+    )
+  }
 
   return (
     <>
       <Layout>
+        {mensaje && mostrarMensaje()}
+
         <h1 className="text-center text-2xl text-white font-light">Crear Nueva Cuenta</h1>
 
         <div className="flex justify-center mt-5">
